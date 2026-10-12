@@ -1,0 +1,115 @@
+# =========================
+# Terraform
+# =========================
+
+# Local Terraform working directory
+.terraform/
+
+# Terraform state
+*.tfstate
+*.tfstate.*
+
+# Crash logs
+crash.log
+crash.*.log
+
+# Terraform variable files that may contain secrets
+*.tfvars
+*.tfvars.json
+
+# Override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Terraform CLI config
+.terraformrc
+terraform.rc
+
+# Saved plans
+*.tfplan
+*.plan
+
+# Lock info from interrupted operations
+.terraform.tfstate.lock.info
+
+
+# =========================
+# Ansible
+# =========================
+
+# Vault password files
+.vault_pass
+.vault_pass.txt
+vault-password*
+*.vault-pass
+
+# Retry files
+*.retry
+
+# Generated inventory files
+inventory.ini
+hosts.ini
+inventory.generated*
+hosts.generated*
+
+# Temporary facts/cache
+.fact_cache/
+ansible_facts/
+.ansible/
+
+# Sensitive variable files
+group_vars/*/vault.yml
+host_vars/*/vault.yml
+
+
+# =========================
+# SSH / credentials
+# =========================
+
+*.pem
+*.key
+*.ppk
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+
+.aws/
+credentials
+
+
+# =========================
+# Environment / secrets
+# =========================
+
+.env
+.env.*
+!.env.example
+
+*.secret
+*.secrets
+
+
+# =========================
+# Editor / OS
+# =========================
+
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+
+# =========================
+# Logs / temp files
+# =========================
+
+*.log
+tmp/
+temp/
+.cache/
