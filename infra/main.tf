@@ -49,7 +49,7 @@ resource "aws_route_table" "public" {
 }
 
 resource "aws_route_table_association" "public" {
-  subnet_id      = aws_subnet.main.id
+  subnet_id      = aws_subnet.public.id
   route_table_id = aws_route_table.public.id
 }
 
@@ -73,7 +73,7 @@ data "aws_ami" "al2023" {
 resource "aws_instance" "app" {
   ami                    = data.aws_ami.al2023.id
   instance_type          = var.instance_type
-  subnet_id              = aws_subnet.main.id
+  subnet_id              = aws_subnet.public.id
   key_name               = aws_key_pair.my_key.key_name
   vpc_security_group_ids = [aws_security_group.allow_http_ssh.id]
 
