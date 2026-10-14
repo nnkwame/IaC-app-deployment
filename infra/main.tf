@@ -101,6 +101,22 @@ resource "aws_vpc_security_group_ingress_rule" "allow_http_ipv4" {
   to_port           = var.http_port
 }
 
+resource "aws_vpc_security_group_ingress_rule" "allow_frontend_voteapp" {
+  security_group_id = aws_security_group.allow_http_ssh.id
+  cidr_ipv4         = var.allowed_cidr_ipv4
+  from_port         = var.http_port_voteapp
+  ip_protocol       = var.ingress_protocol
+  to_port           = var.http_port_voteapp
+}
+
+resource "aws_vpc_security_group_ingress_rule" "allow_frontend_result" {
+  security_group_id = aws_security_group.allow_http_ssh.id
+  cidr_ipv4         = var.allowed_cidr_ipv4
+  from_port         = var.http_port_result
+  ip_protocol       = var.ingress_protocol
+  to_port           = var.http_port_result
+}
+
 resource "aws_vpc_security_group_ingress_rule" "allow_https_ipv4" {
   security_group_id = aws_security_group.allow_http_ssh.id
   cidr_ipv4         = var.allowed_cidr_ipv4

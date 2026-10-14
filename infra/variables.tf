@@ -81,6 +81,20 @@ variable "http_port" {
   default     = 80
 }
 
+variable "http_port_voteapp" {
+  description = "TCP port used for voteapp frontend."
+  type        = number
+  default     = 8080
+}
+
+variable "http_port_result" {
+  description = "TCP port used for result frontend."
+  type        = number
+  default     = 8081
+}
+
+
+
 variable "https_port" {
   description = "TCP port used for HTTPS ingress."
   type        = number
