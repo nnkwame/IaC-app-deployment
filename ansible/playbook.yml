@@ -1,0 +1,8 @@
+---
+- name: Configure single-server application host
+  hosts: app
+  become: true
+
+  roles:
+    - pull_repo
+    - docker_operations
