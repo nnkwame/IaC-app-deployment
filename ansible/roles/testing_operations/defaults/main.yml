@@ -1,0 +1,30 @@
+#SPDX-License-Identifier: MIT-0
+---
+# defaults file for roles/testing_operations
+test_target_host: "{{ hostvars['app'].ansible_host }}"
+
+frontend_endpoints:
+  - name: voting
+    port: 8080
+    path: /
+
+  - name: results
+    port: 8081
+    path: /
+
+k6_load_levels:
+  - 1
+  - 10
+  - 50
+  - 100
+  - 250
+  - 500
+  - 750
+  - 1000
+#  - 5000
+#  - 10000
+
+k6_test_duration: "30s"
+k6_sleep_seconds: 1
+
+test_dir: /tmp/infrastructure-load-tests

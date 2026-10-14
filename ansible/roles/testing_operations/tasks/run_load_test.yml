@@ -1,0 +1,25 @@
+- name: Set current load test parameters
+  ansible.builtin.set_fact:
+    current_endpoint: "{{ load_test.0 }}"
+    current_vus: "{{ load_test.1 }}"
+
+- name: Generate k6 test
+  ansible.builtin.template:
+    src: load-test.js.j2
+    dest: >-
+      {{ test_dir }}/{{ current_endpoint.name }}-{{ current_endpoint.port }}-{{ current_vus }}vus.js
+    mode: "0644"
+
+- name: Run load test
+  ansible.builtin.command:
+    cmd: >-
+      docker run --rm 
+      -v {{ test_dir }}:/tests:ro 
+      grafana/k6 
+      run /tests/{{ current_endpoint.name }}-{{ current_endpoint.port }}-{{ current_vus }}vus.js
+  register: current_k6_result
+  changed_when: false
+
+- name: Show load test result
+  ansible.builtin.debug:
+    var: current_k6_result.stdout_lines

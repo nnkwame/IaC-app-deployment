@@ -1,0 +1,61 @@
+#SPDX-License-Identifier: MIT-0
+---
+# tasks file for roles/testing_operations
+#- name: Install k6 prerequisites
+#  ansible.builtin.apt:
+#    name:
+#      - ca-certificates
+#      - curl
+#      - gnupg
+#    state: present
+#    update_cache: true
+#  become: true
+
+#- name: Download k6 repository signing key
+#  ansible.builtin.shell: |
+#    curl -fsSL https://dl.k6.io/key.gpg |
+#    gpg --dearmor --yes -o /usr/share/keyrings/k6-archive-keyring.gpg
+#  args:
+#    creates: /usr/share/keyrings/k6-archive-keyring.gpg
+#  become: true
+
+#- name: Configure k6 apt repository
+#  ansible.builtin.copy:
+#    dest: /etc/apt/sources.list.d/k6.sources
+#    mode: "0644"
+#    content: |
+#      Types: deb
+#      URIs: https://dl.k6.io/deb
+#      Suites: stable
+#      Components: main
+#      Signed-By: /usr/share/keyrings/k6-archive-keyring.gpg
+#  become: true
+
+#- name: Install k6
+#  ansible.builtin.apt:
+#    name: k6
+#    state: present
+#    update_cache: true
+#  become: true
+
+- name: Pull k6 image
+  community.docker.docker_image:
+    name: grafana/k6
+    source: pull
+
+- name: Create load test directory
+  ansible.builtin.file:
+    path: "{{ test_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Run load tests
+  ansible.builtin.include_tasks:
+    file: run_load_test.yml
+  loop: "{{ frontend_endpoints | product(k6_load_levels) | list }}"
+  loop_control:
+    loop_var: load_test
+    label: >-
+      {{ load_test.0.name }}
+      port={{ load_test.0.port }}
+      vus={{ load_test.1 }}

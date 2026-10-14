@@ -1,0 +1,7 @@
+---
+- name: Run infrastructure load tests
+  hosts: testers
+  gather_facts: true
+
+  roles:
+    - testing_operations
