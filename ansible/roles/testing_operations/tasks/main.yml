@@ -43,9 +43,48 @@
     name: grafana/k6
     source: pull
 
+- name: Install Python venv support
+  ansible.builtin.apt:
+    name:
+      - python3
+      - python3-venv
+      - python3-pip
+    state: present
+    update_cache: true
+  become: true
+
+- name: Create load testing Python virtual environment
+  ansible.builtin.command:
+    cmd: "python3 -m venv {{ load_test_venv }}"
+    creates: "{{ load_test_venv }}/bin/python"
+
+- name: Install matplotlib in load testing virtual environment
+  ansible.builtin.pip:
+    name:
+      - matplotlib
+    virtualenv: "{{ load_test_venv }}"
+
+#- name: Install matplotlib for current user
+#  ansible.builtin.pip:
+#    name: matplotlib
+#    extra_args: --user
+#  become: false
+
 - name: Create load test directory
   ansible.builtin.file:
     path: "{{ test_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Install results analysis script
+  ansible.builtin.copy:
+    src: aggregate_and_plot.py
+    dest: "{{ test_dir }}/aggregate_and_plot.py"
+    mode: "0755"
+
+- name: Create k6 results directory
+  ansible.builtin.file:
+    path: "{{ test_dir }}/results"
     state: directory
     mode: "0755"
 
@@ -59,3 +98,11 @@
       {{ load_test.0.name }}
       port={{ load_test.0.port }}
       vus={{ load_test.1 }}
+
+- name: Generate aggregate results and plots
+  ansible.builtin.command:
+    argv:
+      - "{{ load_test_venv }}/bin/python"
+#      - python3
+      - "{{ test_dir }}/aggregate_and_plot.py"
+  changed_when: false

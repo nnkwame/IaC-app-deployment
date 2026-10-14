@@ -29,3 +29,36 @@ export default function () {
 
   sleep({{ k6_sleep_seconds }});
 }
+
+export function handleSummary(data) {
+  const latency = data.metrics.http_req_duration.values;
+  const failures = data.metrics.http_req_failed.values;
+  const requests = data.metrics.http_reqs.values;
+
+  const result = {
+    endpoint: '{{ current_endpoint.name }}',
+    port: {{ current_endpoint.port }},
+    vus: {{ current_vus }},
+
+    latency_ms: {
+      p05: latency['p(5)'],
+      p25: latency['p(25)'],
+      median: latency.med,
+      average: latency.avg,
+      p75: latency['p(75)'],
+      p95: latency['p(95)'],
+      p99: latency['p(99)'],
+    },
+
+    failure_rate: failures.rate,
+    requests: requests.count,
+    requests_per_second: requests.rate,
+
+    timestamp: new Date().toISOString(),
+  };
+
+  return {
+    '/results/{{ current_endpoint.name }}-{{ current_endpoint.port }}-{{ current_vus }}vus.json':
+      JSON.stringify(result, null, 2),
+  };
+}

@@ -2,6 +2,7 @@
 ---
 # defaults file for roles/testing_operations
 test_target_host: "{{ hostvars['app'].ansible_host }}"
+load_test_venv: "{{ ansible_env.HOME }}/.venvs/load-testing"
 
 frontend_endpoints:
   - name: voting

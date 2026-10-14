@@ -14,7 +14,9 @@
   ansible.builtin.command:
     cmd: >-
       docker run --rm 
+      --user {{ ansible_user_uid }}:{{ ansible_user_gid }}
       -v {{ test_dir }}:/tests:ro 
+      -v {{ test_dir }}/results:/results
       grafana/k6 
       run /tests/{{ current_endpoint.name }}-{{ current_endpoint.port }}-{{ current_vus }}vus.js
   register: current_k6_result
