@@ -1,0 +1,6 @@
+#SPDX-License-Identifier: MIT-0
+---
+# defaults file for roles/pull_repo
+repo_url: "https://github.com/Pokfinner/ironhack-project-1.git"
+repo_dest: "/opt/my-app"
+repo_version: "main"

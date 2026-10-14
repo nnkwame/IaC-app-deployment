@@ -1,0 +1,17 @@
+#SPDX-License-Identifier: MIT-0
+# tasks file for roles/pull_repo
+---
+- name: Ensure Git is installed
+  ansible.builtin.dnf:
+    name: git
+    state: present
+    update_cache: true
+  become: true
+
+- name: Clone application repository
+  ansible.builtin.git:
+    repo: "{{ repo_url }}"
+    dest: "{{ repo_dest }}"
+    version: "{{ repo_version }}"
+    update: true
+  become: true

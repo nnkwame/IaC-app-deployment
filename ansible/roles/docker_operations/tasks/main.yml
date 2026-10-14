@@ -1,0 +1,57 @@
+#SPDX-License-Identifier: MIT-0
+---
+# tasks file for roles/docker_operations
+- name: Install Docker
+  ansible.builtin.dnf:
+    name: docker
+    state: present
+    update_cache: true
+  become: true
+
+- name: Ensure Docker is running and enabled
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+  become: true
+
+- name: Add user to docker group
+  ansible.builtin.user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: true
+  become: true
+  register: docker_group_result
+
+- name: Reset SSH connection
+  ansible.builtin.meta: reset_connection
+  when: docker_group_result.changed
+
+- name: Download Docker Compose plugin RPM
+  ansible.builtin.get_url:
+    url: "https://download.docker.com/linux/centos/9/aarch64/stable/Packages/docker-compose-plugin-2.40.3-1.el9.aarch64.rpm"
+    dest: /tmp/docker-compose-plugin.rpm
+    mode: "0644"
+
+- name: Install Docker Compose plugin RPM
+  ansible.builtin.dnf:
+    name: /tmp/docker-compose-plugin.rpm
+    state: present
+    disable_gpg_check: true
+  become: true
+
+- name: Verify Docker Compose installation
+  ansible.builtin.command:
+    cmd: docker compose version
+  register: docker_compose_version
+  changed_when: false
+
+- name: Show Docker Compose version
+  ansible.builtin.debug:
+    var: docker_compose_version.stdout
+
+- name: Build and start application
+  community.docker.docker_compose_v2:
+    project_src: "/opt/my-app"
+    state: present
+    build: always
