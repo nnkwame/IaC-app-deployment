@@ -1,7 +1,7 @@
 #SPDX-License-Identifier: MIT-0
 ---
 # defaults file for roles/testing_operations
-test_target_host: "{{ hostvars['app'].ansible_host }}"
+test_target_host: "{{ hostvars['lb'].ansible_host }}"
 load_test_venv: "{{ ansible_env.HOME }}/.venvs/load-testing"
 
 frontend_endpoints:
