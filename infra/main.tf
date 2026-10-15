@@ -18,6 +18,31 @@ locals {
   vpc_name = "voteapp-proj-1-${var.student_name}"
 }
 
+# Create IGW
+resource "aws_internet_gateway" "igw" {
+  vpc_id = aws_vpc.main.id
+
+  tags = {
+    Name = "${local.vpc_name}-igw"
+  }
+}
+
+resource "aws_eip" "nat" {
+  domain = "vpc"
+}
+resource "aws_nat_gateway" "natgw" {
+  allocation_id = aws_eip.nat.id
+  subnet_id     = aws_subnet.public.id
+
+  depends_on = [
+    aws_internet_gateway.igw
+  ]
+
+  tags = {
+    Name = "${local.vpc_name}-app-natgw"
+  }
+}
+
 # Create a single subnet
 resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.main.id
@@ -30,17 +55,67 @@ resource "aws_subnet" "public" {
   }
 }
 
-# Create IGW
-resource "aws_internet_gateway" "igw" {
+# Create a route table
+resource "aws_route_table" "public" {
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.igw.id
+  }
+
+  tags = {
+    Name = "${local.vpc_name}-public-rt"
+  }
+}
+
+resource "aws_route_table_association" "public" {
+  subnet_id      = aws_subnet.public.id
+  route_table_id = aws_route_table.public.id
+}
+
+resource "aws_subnet" "private" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = var.subnet_cidr_priv
+  availability_zone = var.az_1
+
+  map_public_ip_on_launch = false
+
+  tags = {
+    Name = "${local.vpc_name}-priv-subnet"
+  }
+}
+resource "aws_route_table" "private" {
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name = "${local.vpc_name}-igw"
+    Name = "${local.vpc_name}-private-rt"
+  }
+}
+resource "aws_route" "private_internet" {
+  route_table_id         = aws_route_table.private.id
+  destination_cidr_block = "0.0.0.0/0"
+
+  nat_gateway_id = aws_nat_gateway.natgw.id
+}
+resource "aws_route_table_association" "private" {
+  subnet_id      = aws_subnet.private.id
+  route_table_id = aws_route_table.private.id
+}
+
+resource "aws_subnet" "public_az2" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = var.subnet_cidr_az2
+  availability_zone       = var.az_2
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name = "${local.vpc_name}-public-az2-subnet"
   }
 }
 
 # Create a route table
-resource "aws_route_table" "public" {
+resource "aws_route_table" "public_az2" {
   vpc_id = aws_vpc.main.id
 
   route {
@@ -320,7 +395,16 @@ resource "local_file" "ansible_inventory" {
   filename = "${path.module}/../ansible/hosts.ini"
 
   content = <<EOF
+[webfront]
+lb ansible_host=${aws_lb.app.dns_name}
+
+[testers]
+jh ansible_host=${aws_instance.jumphost.public_ip} ansible_user=ubuntu ansible_ssh_private_key_file=./${var.student_name}-ssh-key.pem
+
 [voteapp]
-app ansible_host=${aws_instance.app.public_ip} ansible_user=ec2-user ansible_ssh_private_key_file=./${var.student_name}-ssh-key.pem
+app ansible_host=${aws_instance.app.private_ip} ansible_user=ec2-user ansible_ssh_private_key_file=./${var.student_name}-ssh-key.pem
+
+[voteapp:vars]
+ansible_ssh_common_args='-o ProxyCommand="ssh -i ./${var.student_name}-ssh-key.pem -W %h:%p -q ubuntu@${aws_instance.jumphost.public_ip}"'
 EOF
 }
