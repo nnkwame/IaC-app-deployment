@@ -1,3 +1,8 @@
+moved {
+  from = aws_security_group.allow_http_ssh
+  to   = module.app_sg.aws_security_group.this
+}
+
 #Create a new vpc
 resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr_block
@@ -44,100 +49,253 @@ resource "aws_route_table" "public" {
   }
 
   tags = {
-    Name = "${local.vpc_name}-public-rt"
+    Name = "${local.vpc_name}-public-az2-rt"
   }
 }
 
-resource "aws_route_table_association" "public" {
-  subnet_id      = aws_subnet.public.id
-  route_table_id = aws_route_table.public.id
+resource "aws_route_table_association" "public_az2" {
+  subnet_id      = aws_subnet.public_az2.id
+  route_table_id = aws_route_table.public_az2.id
 }
 
 # aws_image
 data "aws_ami" "al2023" {
   most_recent = true
-  owners      = var.ami_owners
+  owners      = ["amazon"]
 
   filter {
-    name   = var.ami_filter_name_key
-    values = [var.ami_name_pattern]
+    name   = "name"
+    values = ["al2023-ami-2023.*"]
   }
 
   filter {
-    name   = var.ami_filter_arch_key
+    name   = "architecture"
     values = [var.ami_architecture]
   }
 }
 
+data "aws_ami" "ubuntu22" {
+  most_recent = true
+  owners      = ["099720109477"]
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-*-server-*"]
+  }
+
+  filter {
+    name   = "architecture"
+    values = [var.ami_architecture]
+  }
+}
+
+
+
+resource "aws_lb" "app" {
+  name               = "${local.vpc_name}-alb"
+  internal           = false
+  load_balancer_type = "application"
+
+  security_groups = [module.alb_sg.security_group_id]
+
+  subnets = [aws_subnet.public.id, aws_subnet.public_az2.id]
+}
+
+resource "aws_lb_target_group" "voting" {
+  name     = "${aws_lb.app.name}-vot-tg"
+  port     = var.http_port_voteapp
+  protocol = "HTTP"
+  vpc_id   = aws_vpc.main.id
+
+  health_check {
+    enabled             = true
+    path                = "/"
+    protocol            = "HTTP"
+    matcher             = "200-399"
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+  }
+}
+
+
+resource "aws_lb_target_group" "results" {
+  name     = "${aws_lb.app.name}-res-tg"
+  port     = var.http_port_result
+  protocol = "HTTP"
+  vpc_id   = aws_vpc.main.id
+
+  health_check {
+    enabled             = true
+    path                = "/"
+    protocol            = "HTTP"
+    matcher             = "200-399"
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+  }
+}
+
+resource "aws_lb_target_group_attachment" "voting" {
+  target_group_arn = aws_lb_target_group.voting.arn
+  target_id        = aws_instance.app.id
+  port             = var.http_port_voteapp
+}
+
+resource "aws_lb_target_group_attachment" "results" {
+  target_group_arn = aws_lb_target_group.results.arn
+  target_id        = aws_instance.app.id
+  port             = var.http_port_result
+}
+
+resource "aws_lb_listener" "voting" {
+  load_balancer_arn = aws_lb.app.arn
+  port              = var.http_port_voteapp
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.voting.arn
+  }
+}
+
+resource "aws_lb_listener" "results" {
+  load_balancer_arn = aws_lb.app.arn
+  port              = var.http_port_result
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.results.arn
+  }
+}
 # Single ec2 instance
 resource "aws_instance" "app" {
-  ami                    = data.aws_ami.al2023.id
-  instance_type          = var.instance_type
-  subnet_id              = aws_subnet.public.id
+  ami           = data.aws_ami.al2023.id
+  instance_type = var.instance_type
+  subnet_id     = aws_subnet.private.id
+
   key_name               = aws_key_pair.my_key.key_name
-  vpc_security_group_ids = [aws_security_group.allow_http_ssh.id]
+  vpc_security_group_ids = [module.app_sg.security_group_id, module.allow_ssh_app.security_group_id]
 
   tags = {
     Name = "${local.vpc_name}-app"
   }
 }
 
-# aws_security_group
-resource "aws_security_group" "allow_http_ssh" {
-  name        = var.security_group_name
-  description = var.security_group_description
-  vpc_id      = aws_vpc.main.id
+resource "aws_instance" "jumphost" {
+  ami           = data.aws_ami.ubuntu22.id
+  instance_type = var.instance_type
+  subnet_id     = aws_subnet.public.id
+
+  key_name               = aws_key_pair.my_key.key_name
+  vpc_security_group_ids = [module.allow_ssh.security_group_id]
 
   tags = {
-    Name = var.security_group_name
+    Name = "${local.vpc_name}-jh"
   }
 }
 
-resource "aws_vpc_security_group_ingress_rule" "allow_http_ipv4" {
-  security_group_id = aws_security_group.allow_http_ssh.id
-  cidr_ipv4         = var.allowed_cidr_ipv4
-  from_port         = var.http_port
-  ip_protocol       = var.ingress_protocol
-  to_port           = var.http_port
+
+module "alb_sg" {
+  source = "./modules/security_group"
+
+  name        = "${var.security_group_name}-alb"
+  description = "${var.security_group_description} - load-balancer"
+  vpc_id      = aws_vpc.main.id
+
+  ingress_rules = [
+    {
+      ip_protocol = var.ingress_protocol
+      from_port   = var.http_port_voteapp
+      to_port     = var.http_port_voteapp
+      cidr_ipv4   = "0.0.0.0/0"
+    },
+    {
+      ip_protocol = var.ingress_protocol
+      from_port   = var.http_port_result
+      to_port     = var.http_port_result
+      cidr_ipv4   = "0.0.0.0/0"
+    }
+  ]
+
+  egress_rules = [
+    {
+      ip_protocol = var.egress_ip_protocol
+      cidr_ipv4   = "0.0.0.0/0"
+    }
+  ]
 }
 
-resource "aws_vpc_security_group_ingress_rule" "allow_frontend_voteapp" {
-  security_group_id = aws_security_group.allow_http_ssh.id
-  cidr_ipv4         = var.allowed_cidr_ipv4
-  from_port         = var.http_port_voteapp
-  ip_protocol       = var.ingress_protocol
-  to_port           = var.http_port_voteapp
+module "app_sg" {
+  source = "./modules/security_group"
+
+  name        = "${var.security_group_name}-app"
+  description = var.security_group_description
+  vpc_id      = aws_vpc.main.id
+
+  ingress_rules = [
+    {
+      ip_protocol              = var.ingress_protocol
+      from_port                = var.http_port_voteapp
+      to_port                  = var.http_port_voteapp
+      source_security_group_id = module.alb_sg.security_group_id
+    },
+    {
+      ip_protocol              = var.ingress_protocol
+      from_port                = var.http_port_result
+      to_port                  = var.http_port_result
+      source_security_group_id = module.alb_sg.security_group_id
+    }
+  ]
 }
 
-resource "aws_vpc_security_group_ingress_rule" "allow_frontend_result" {
-  security_group_id = aws_security_group.allow_http_ssh.id
-  cidr_ipv4         = var.allowed_cidr_ipv4
-  from_port         = var.http_port_result
-  ip_protocol       = var.ingress_protocol
-  to_port           = var.http_port_result
+module "allow_ssh" {
+  source = "./modules/security_group"
+
+  name        = "${var.security_group_name}-ssh"
+  description = "${var.security_group_description} - ssh connections"
+  vpc_id      = aws_vpc.main.id
+
+  ingress_rules = [
+    {
+      ip_protocol = var.ingress_protocol
+      from_port   = var.ssh_port
+      to_port     = var.ssh_port
+      cidr_ipv4   = var.allowed_cidr_ipv4
+    }
+  ]
+
+  egress_rules = [
+    {
+      ip_protocol = var.egress_ip_protocol
+      cidr_ipv4   = "0.0.0.0/0"
+    }
+  ]
 }
 
-resource "aws_vpc_security_group_ingress_rule" "allow_https_ipv4" {
-  security_group_id = aws_security_group.allow_http_ssh.id
-  cidr_ipv4         = var.allowed_cidr_ipv4
-  from_port         = var.https_port
-  ip_protocol       = var.ingress_protocol
-  to_port           = var.https_port
+module "allow_ssh_app" {
+  source = "./modules/security_group"
+
+  name        = "${var.security_group_name}-ssh-app"
+  description = "${var.security_group_description} - ssh connections for app grp"
+  vpc_id      = aws_vpc.main.id
+
+  ingress_rules = [
+    {
+      ip_protocol              = var.ingress_protocol
+      from_port                = var.ssh_port
+      to_port                  = var.ssh_port
+      source_security_group_id = module.allow_ssh.security_group_id
+    }
+  ]
+
+  egress_rules = [
+    {
+      ip_protocol = var.egress_ip_protocol
+      cidr_ipv4   = "0.0.0.0/0"
+    }
+  ]
 }
 
-resource "aws_vpc_security_group_ingress_rule" "allow_ssh_ipv4" {
-  security_group_id = aws_security_group.allow_http_ssh.id
-  cidr_ipv4         = var.allowed_cidr_ipv4
-  from_port         = var.ssh_port
-  ip_protocol       = var.ingress_protocol
-  to_port           = var.ssh_port
-}
-
-resource "aws_vpc_security_group_egress_rule" "allow_all_traffic_ipv4" {
-  security_group_id = aws_security_group.allow_http_ssh.id
-  cidr_ipv4         = var.allowed_cidr_ipv4
-  ip_protocol       = var.egress_ip_protocol # semantically equivalent to all ports
-}
 
 # Generates a secure private key
 resource "tls_private_key" "ed25519" {
