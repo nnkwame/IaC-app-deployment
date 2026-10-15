@@ -15,34 +15,29 @@ variable "subnet_cidr" {
   default     = "10.1.1.0/24"
 }
 
+variable "subnet_cidr_priv" {
+  description = "The CIDR block definition of the subnet"
+  type        = string
+  default     = "10.1.10.0/24"
+}
+
+
+variable "subnet_cidr_az2" {
+  description = "The CIDR block definition of the subnet"
+  type        = string
+  default     = "10.1.2.0/24"
+}
+
 variable "az_1" {
   description = "The availability zone for the subnet"
   type        = string
   default     = "us-east-1a"
 }
 
-variable "ami_owners" {
-  description = "List of AMI owners to filter on."
-  type        = list(string)
-  default     = ["amazon"]
-}
-
-variable "ami_filter_name_key" {
-  description = "AMI filter attribute name used to match the AMI name pattern."
+variable "az_2" {
+  description = "The availability zone 2 for the subnet"
   type        = string
-  default     = "name"
-}
-
-variable "ami_name_pattern" {
-  description = "Glob pattern used to match the AL2023 AMI name."
-  type        = string
-  default     = "al2023-ami-2023.*-x86_64"
-}
-
-variable "ami_filter_arch_key" {
-  description = "AMI filter attribute name used to match the architecture."
-  type        = string
-  default     = "architecture"
+  default     = "us-east-1b"
 }
 
 variable "ami_architecture" {
